@@ -1,0 +1,14 @@
+﻿*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:100%;min-height:100%;scrollbar-width:none}
+body{background:#d8d8d6;overflow-x:hidden;font-family:Arial,sans-serif}
+body::-webkit-scrollbar{display:none}
+#cube-canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none;z-index:1}
+#cube-canvas:focus{outline:none}
+.scroll-container{position:relative;pointer-events:none}
+.scroll-section{height:100vh}
+.controls{position:fixed;bottom:18px;right:20px;z-index:2;display:flex;align-items:center;gap:12px;opacity:.5;color:#41434a;font-size:12px}
+.controls:hover,.controls:focus-within{opacity:1}
+.controls label{display:flex;gap:8px;align-items:center}
+.controls input{width:90px;accent-color:#6b7483}
+.controls button{border:1px solid #a5a7a9;border-radius:50%;background:#ddd9;width:27px;height:27px;cursor:pointer;color:inherit}
+#render-status{position:fixed;bottom:20px;left:20px;z-index:2;color:#50545c;font-size:12px;opacity:.65;pointer-events:none}

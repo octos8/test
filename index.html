@@ -1,0 +1,18 @@
+﻿<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Crystal Cube</title>
+<link rel="stylesheet" href="./css/style.css">
+</head>
+<body>
+<canvas id="cube-canvas" aria-label="드래그하여 회전하는 3D 크리스탈 큐브"></canvas>
+<output id="render-status" aria-live="polite">광학 렌더러 준비 중</output>
+<main class="scroll-container" aria-label="스크롤하면 큐브가 분해되고 정렬됩니다">
+<section class="scroll-section"></section><section class="scroll-section"></section>
+<section class="scroll-section"></section><section class="scroll-section"></section>
+</main>
+<div class="controls"><button id="reset-view" type="button" title="시점 초기화">↺</button><label>빛 <input id="light-direction" aria-label="빛 방향" type="range" min="-3.14" max="3.14" step="0.05" value="0"></label></div>
+<script type="module" src="./js/cube-bundle.js"></script>
+</body>
+</html>
