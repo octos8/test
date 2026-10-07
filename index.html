@@ -1,18 +1,2065 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ko">
 <head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Crystal Cube</title>
-<link rel="stylesheet" href="./css/style.css">
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+<title>Crystal Cube Scroll Morph</title>
+
+<style>
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: auto;
+}
+
+body {
+  margin: 0;
+
+  background:
+    radial-gradient(
+      circle at 50% 40%,
+      #ffffff 0%,
+      #f6f8fa 45%,
+      #eef1f4 100%
+    );
+
+  font-family: Arial, sans-serif;
+
+  color: #111;
+}
+
+#canvas {
+  position: fixed;
+
+  top: 0;
+  left: 0;
+
+  width: 100%;
+  height: 100%;
+
+  z-index: 1;
+
+  pointer-events: auto;
+  touch-action: none;
+  cursor: grab;
+}
+
+.scroll-container {
+  pointer-events: none;
+  position: relative;
+
+  z-index: 2;
+}
+
+.section {
+  height: 100vh;
+
+  display: flex;
+  align-items: flex-end;
+
+  padding:
+    0
+    0
+    8vh
+    7vw;
+
+  pointer-events: none;
+}
+
+.section-content {
+  opacity: 0.45;
+
+  font-size: 12px;
+
+  letter-spacing: 0.15em;
+
+  text-transform: uppercase;
+}
+
+.section-content span {
+  display: block;
+
+  margin-bottom: 8px;
+
+  font-size: 10px;
+
+  opacity: 0.55;
+}
+
+.section-content strong {
+  font-size: clamp(20px, 2vw, 30px);
+
+  font-weight: 400;
+
+  letter-spacing: -0.02em;
+}
+
+@media (max-width: 768px) {
+
+  .section {
+    padding-left: 24px;
+  }
+
+}
+</style>
+
+
+<script type="importmap">
+{
+  "imports": {
+    "three":
+    "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+
+    "three/addons/":
+    "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+  }
+}
+</script>
+
 </head>
+
+
 <body>
-<canvas id="cube-canvas" aria-label="드래그하여 회전하는 3D 크리스탈 큐브"></canvas>
-<output id="render-status" aria-live="polite">광학 렌더러 준비 중</output>
-<main class="scroll-container" aria-label="스크롤하면 큐브가 분해되고 정렬됩니다">
-<section class="scroll-section"></section><section class="scroll-section"></section>
-<section class="scroll-section"></section><section class="scroll-section"></section>
+
+<canvas id="canvas"></canvas>
+
+
+<main class="scroll-container">
+
+  <section class="section">
+    <div class="section-content">
+      <span>01</span>
+      <strong>Crystal</strong>
+    </div>
+  </section>
+
+
+  <section class="section">
+    <div class="section-content">
+      <span>02</span>
+      <strong>Break</strong>
+    </div>
+  </section>
+
+
+  <section class="section">
+    <div class="section-content">
+      <span>03</span>
+      <strong>Structure</strong>
+    </div>
+  </section>
+
+
+  <section class="section">
+    <div class="section-content">
+      <span>04</span>
+      <strong>Rebuild</strong>
+    </div>
+  </section>
+
+
+  <section class="section">
+    <div class="section-content">
+      <span>05</span>
+      <strong>Question</strong>
+    </div>
+  </section>
+
 </main>
-<div class="controls"><button id="reset-view" type="button" title="시점 초기화">↺</button><label>빛 <input id="light-direction" aria-label="빛 방향" type="range" min="-3.14" max="3.14" step="0.05" value="0"></label></div>
-<script type="module" src="./js/cube-bundle.js"></script>
+
+
+<script type="module">
+
+import * as THREE from "three";
+
+import {
+  RoundedBoxGeometry
+} from "three/addons/geometries/RoundedBoxGeometry.js";
+
+import {
+  RoomEnvironment
+} from "three/addons/environments/RoomEnvironment.js";
+
+
+
+/* =========================================================
+   BASIC
+========================================================= */
+
+const canvas = document.querySelector("#canvas");
+
+
+const renderer = new THREE.WebGLRenderer({
+
+  canvas,
+
+  antialias: true,
+
+  alpha: false,
+
+  powerPreference: "high-performance"
+
+});
+
+
+renderer.setPixelRatio(
+  Math.min(window.devicePixelRatio, 1.7)
+);
+
+
+renderer.setSize(
+  window.innerWidth,
+  window.innerHeight
+);
+
+
+renderer.outputColorSpace =
+  THREE.SRGBColorSpace;
+
+
+renderer.toneMapping =
+  THREE.ACESFilmicToneMapping;
+
+
+renderer.toneMappingExposure =
+  1.18;
+
+
+
+/* =========================================================
+   SCENE
+========================================================= */
+
+const scene = new THREE.Scene();
+
+
+scene.background =
+  new THREE.Color("#f5f7f8");
+
+
+
+/* =========================================================
+   CAMERA
+========================================================= */
+
+const camera =
+  new THREE.PerspectiveCamera(
+
+    38,
+
+    window.innerWidth /
+    window.innerHeight,
+
+    0.1,
+
+    100
+
+  );
+
+
+camera.position.set(
+  0,
+  0,
+  11.5
+);
+
+
+
+/* =========================================================
+   ENVIRONMENT
+   유리의 반사 / 굴절 표현에서 가장 중요
+========================================================= */
+
+const pmremGenerator =
+  new THREE.PMREMGenerator(renderer);
+
+
+const roomEnvironment =
+  new RoomEnvironment();
+
+
+const environmentTexture =
+  pmremGenerator
+  .fromScene(roomEnvironment, 0.04)
+  .texture;
+
+
+scene.environment =
+  environmentTexture;
+
+
+roomEnvironment.dispose();
+
+pmremGenerator.dispose();
+
+
+
+/* =========================================================
+   LIGHT
+========================================================= */
+
+
+/*
+화이트 키라이트
+*/
+
+const keyLight =
+  new THREE.DirectionalLight(
+    0xffffff,
+    4.5
+  );
+
+
+keyLight.position.set(
+  -4,
+  7,
+  7
+);
+
+scene.add(keyLight);
+
+
+
+/*
+쿨 블루
+*/
+
+const coolLight =
+  new THREE.PointLight(
+    0x8fdcff,
+    35,
+    20
+  );
+
+
+coolLight.position.set(
+  -5,
+  1,
+  5
+);
+
+scene.add(coolLight);
+
+
+
+/*
+핑크 / 마젠타 계열
+프리즘 색 분산 보조
+*/
+
+const pinkLight =
+  new THREE.PointLight(
+    0xff9de8,
+    22,
+    18
+  );
+
+
+pinkLight.position.set(
+  5,
+  3,
+  3
+);
+
+scene.add(pinkLight);
+
+
+
+/*
+따뜻한 스펙트럼
+*/
+
+const warmLight =
+  new THREE.PointLight(
+    0xffd59e,
+    18,
+    18
+  );
+
+
+warmLight.position.set(
+  1,
+  -5,
+  4
+);
+
+scene.add(warmLight);
+
+
+
+/* =========================================================
+   GLASS MATERIAL
+
+   네가 준 프롬프트 핵심:
+
+   clear optical prism glass
+   thick crystal
+   transmission
+   refraction
+   chromatic dispersion
+   glossy reflection
+   cool blue tint
+   beveled edges
+   iridescence
+========================================================= */
+
+const glassMaterial =
+  new THREE.MeshPhysicalMaterial({
+
+    /*
+    거의 투명한 쿨 그레이 블루
+    */
+
+    color:
+      new THREE.Color(
+        0xeaf5fa
+      ),
+
+
+    metalness:
+      0,
+
+
+    roughness:
+      0.035,
+
+
+    /*
+    핵심
+    */
+
+    transmission:
+      1,
+
+
+    opacity:
+      1,
+
+
+    transparent:
+      true,
+
+
+    /*
+    유리 내부 두께
+    */
+
+    thickness:
+      1.6,
+
+
+    /*
+    실제 크리스털 굴절률 느낌
+    */
+
+    ior:
+      1.52,
+
+
+    /*
+    내부 색감
+    */
+
+    attenuationColor:
+      new THREE.Color(
+        0xbad8e5
+      ),
+
+
+    attenuationDistance:
+      4.5,
+
+
+    /*
+    반사
+    */
+
+    specularIntensity:
+      1,
+
+
+    specularColor:
+      new THREE.Color(
+        0xffffff
+      ),
+
+
+    envMapIntensity:
+      2.4,
+
+
+    /*
+    표면 코팅
+    */
+
+    clearcoat:
+      1,
+
+
+    clearcoatRoughness:
+      0.01,
+
+
+    /*
+    약한 홀로그램 느낌
+    */
+
+    iridescence:
+      0.32,
+
+
+    iridescenceIOR:
+      1.3,
+
+
+    iridescenceThicknessRange:
+      [
+        100,
+        450
+      ],
+
+
+    side:
+      THREE.DoubleSide
+
+  });
+
+
+
+/*
+Three.js 최신 버전
+Chromatic Dispersion
+
+RGB 빛 분리
+*/
+
+if (
+  "dispersion"
+  in
+  glassMaterial
+) {
+
+  glassMaterial.dispersion =
+    0.22;
+
+}
+
+
+
+/* =========================================================
+   CUBE GROUP
+========================================================= */
+
+const group =
+  new THREE.Group();
+
+
+scene.add(group);
+
+
+
+/* =========================================================
+   SETTINGS
+========================================================= */
+
+const PIECES_PER_AXIS = 3;
+
+
+/*
+3 × 3 × 3
+
+= 27개
+*/
+
+const PIECE_COUNT =
+  PIECES_PER_AXIS ** 3;
+
+
+const PIECE_SIZE =
+  0.38;
+
+
+const CUBE_GAP =
+  0.47;
+
+
+
+/* =========================================================
+   BEVELED CUBE GEOMETRY
+
+   RoundedBox를 이용해서
+   빛이 모서리에 걸리게 함
+========================================================= */
+
+const geometry =
+  new RoundedBoxGeometry(
+
+    PIECE_SIZE,
+    PIECE_SIZE,
+    PIECE_SIZE,
+
+    4,
+
+    0.055
+
+  );
+
+
+
+/* =========================================================
+   RANDOM
+========================================================= */
+
+function seededRandom(seed) {
+
+  let value =
+    Math.sin(seed * 9999.91)
+    * 43758.5453;
+
+  return value -
+    Math.floor(value);
+
+}
+
+
+
+/* =========================================================
+   STATE ARRAYS
+========================================================= */
+
+const cubePositions = [];
+
+const scatterPositions1 = [];
+
+const barPositions = [];
+
+const scatterPositions2 = [];
+
+const questionPositions = [];
+
+
+const cubeRotations = [];
+
+const scatterRotations1 = [];
+
+const barRotations = [];
+
+const scatterRotations2 = [];
+
+const questionRotations = [];
+
+
+
+/* =========================================================
+   ORIGINAL CUBE POSITION
+========================================================= */
+
+for (
+  let x = 0;
+  x < PIECES_PER_AXIS;
+  x++
+) {
+
+  for (
+    let y = 0;
+    y < PIECES_PER_AXIS;
+    y++
+  ) {
+
+    for (
+      let z = 0;
+      z < PIECES_PER_AXIS;
+      z++
+    ) {
+
+      const px =
+        (
+          x -
+          (PIECES_PER_AXIS - 1) / 2
+        )
+        *
+        CUBE_GAP;
+
+
+      const py =
+        (
+          y -
+          (PIECES_PER_AXIS - 1) / 2
+        )
+        *
+        CUBE_GAP;
+
+
+      const pz =
+        (
+          z -
+          (PIECES_PER_AXIS - 1) / 2
+        )
+        *
+        CUBE_GAP;
+
+
+      cubePositions.push(
+
+        new THREE.Vector3(
+          px,
+          py,
+          pz
+        )
+
+      );
+
+
+      cubeRotations.push(
+
+        new THREE.Quaternion()
+
+      );
+
+    }
+
+  }
+
+}
+
+
+
+/* =========================================================
+   SCATTER 01
+========================================================= */
+
+for (
+  let i = 0;
+  i < PIECE_COUNT;
+  i++
+) {
+
+  const angle =
+    seededRandom(i + 10)
+    *
+    Math.PI
+    *
+    2;
+
+
+  const radius =
+    2.3
+    +
+    seededRandom(i + 20)
+    *
+    3.5;
+
+
+  const y =
+    (
+      seededRandom(i + 30)
+      -
+      0.5
+    )
+    *
+    7;
+
+
+  const z =
+    (
+      seededRandom(i + 40)
+      -
+      0.5
+    )
+    *
+    5;
+
+
+  scatterPositions1.push(
+
+    new THREE.Vector3(
+
+      Math.cos(angle)
+      *
+      radius,
+
+      y,
+
+      Math.sin(angle)
+      *
+      radius
+      *
+      0.45
+      +
+      z
+      *
+      0.4
+
+    )
+
+  );
+
+
+  const euler =
+    new THREE.Euler(
+
+      seededRandom(i + 50)
+      *
+      Math.PI
+      *
+      2,
+
+      seededRandom(i + 60)
+      *
+      Math.PI
+      *
+      2,
+
+      seededRandom(i + 70)
+      *
+      Math.PI
+      *
+      2
+
+    );
+
+
+  scatterRotations1.push(
+
+    new THREE.Quaternion()
+    .setFromEuler(euler)
+
+  );
+
+}
+
+
+
+/* =========================================================
+   BAR
+
+   3 × 9 × 1
+   = 27
+========================================================= */
+
+let barIndex = 0;
+
+
+for (
+  let y = 0;
+  y < 9;
+  y++
+) {
+
+  for (
+    let x = 0;
+    x < 3;
+    x++
+  ) {
+
+    for (
+      let z = 0;
+      z < 1;
+      z++
+    ) {
+
+      const px =
+        (
+          x - 1
+        )
+        *
+        0.42;
+
+
+      const py =
+        (
+          y - 4
+        )
+        *
+        0.43;
+
+
+      const pz =
+        (
+          z
+        )
+        *
+        0.43;
+
+
+      barPositions.push(
+
+        new THREE.Vector3(
+          px,
+          py,
+          pz
+        )
+
+      );
+
+
+      barRotations.push(
+
+        new THREE.Quaternion()
+
+      );
+
+
+      barIndex++;
+
+    }
+
+  }
+
+}
+
+
+
+/* =========================================================
+   SCATTER 02
+========================================================= */
+
+for (
+  let i = 0;
+  i < PIECE_COUNT;
+  i++
+) {
+
+  const angle =
+    seededRandom(i + 500)
+    *
+    Math.PI
+    *
+    2;
+
+
+  const radius =
+    2.5
+    +
+    seededRandom(i + 520)
+    *
+    3.7;
+
+
+  const x =
+    Math.cos(angle)
+    *
+    radius;
+
+
+  const y =
+    (
+      seededRandom(i + 540)
+      -
+      0.5
+    )
+    *
+    7;
+
+
+  const z =
+    Math.sin(angle)
+    *
+    radius
+    *
+    0.7;
+
+
+  scatterPositions2.push(
+
+    new THREE.Vector3(
+      x,
+      y,
+      z
+    )
+
+  );
+
+
+  const rotation =
+    new THREE.Euler(
+
+      seededRandom(i + 550)
+      *
+      Math.PI
+      *
+      2,
+
+      seededRandom(i + 560)
+      *
+      Math.PI
+      *
+      2,
+
+      seededRandom(i + 570)
+      *
+      Math.PI
+      *
+      2
+
+    );
+
+
+  scatterRotations2.push(
+
+    new THREE.Quaternion()
+    .setFromEuler(rotation)
+
+  );
+
+}
+
+
+
+/* =========================================================
+   QUESTION MARK
+
+   24개 = 곡선
+
+   3개 = 아래 점
+
+   총 27
+========================================================= */
+
+
+/*
+물음표 중심 경로
+*/
+
+const questionCurve =
+  new THREE.CatmullRomCurve3([
+
+    new THREE.Vector3(
+      -1.65,
+      2.25,
+      0
+    ),
+
+    new THREE.Vector3(
+      -1.15,
+      3.05,
+      0
+    ),
+
+    new THREE.Vector3(
+      0,
+      3.4,
+      0
+    ),
+
+    new THREE.Vector3(
+      1.35,
+      3.15,
+      0
+    ),
+
+    new THREE.Vector3(
+      1.95,
+      2.35,
+      0
+    ),
+
+    new THREE.Vector3(
+      1.8,
+      1.35,
+      0
+    ),
+
+    new THREE.Vector3(
+      1.1,
+      0.55,
+      0
+    ),
+
+    new THREE.Vector3(
+      0.25,
+      -0.05,
+      0
+    ),
+
+    new THREE.Vector3(
+      0,
+      -0.85,
+      0
+    ),
+
+    new THREE.Vector3(
+      0,
+      -1.35,
+      0
+    )
+
+  ]);
+
+
+questionCurve.curveType =
+  "catmullrom";
+
+
+questionCurve.tension =
+  0.45;
+
+
+
+/* 물음표 곡선 24개 + 아래 점 3개 = 총 27개 */
+
+const curvePointCount = PIECE_COUNT - 3;
+
+
+const curvePoints =
+  questionCurve.getPoints(
+    curvePointCount - 1
+  );
+
+
+for (
+  let i = 0;
+  i < curvePoints.length;
+  i++
+) {
+
+  const current =
+    curvePoints[i];
+
+
+  const prev =
+    curvePoints[
+      Math.max(
+        i - 1,
+        0
+      )
+    ];
+
+
+  const next =
+    curvePoints[
+      Math.min(
+        i + 1,
+        curvePoints.length - 1
+      )
+    ];
+
+
+  const tangent =
+    next
+    .clone()
+    .sub(prev)
+    .normalize();
+
+
+  /*
+  2D normal
+  */
+
+  const normal =
+    new THREE.Vector3(
+      -tangent.y,
+      tangent.x,
+      0
+    );
+
+
+  for (
+    let width = 0;
+    width <= 0;
+    width++
+  ) {
+
+    for (
+      let depth = 0;
+      depth <= 0;
+      depth++
+    ) {
+
+      const position =
+        current
+        .clone();
+
+
+      position.add(
+
+        normal
+        .clone()
+        .multiplyScalar(
+          width * 0.38
+        )
+
+      );
+
+
+      position.z =
+        depth
+        *
+        0.4;
+
+
+      questionPositions.push(
+        position
+      );
+
+
+      questionRotations.push(
+
+        new THREE.Quaternion()
+
+      );
+
+    }
+
+  }
+
+}
+
+
+
+/*
+물음표 아래 점
+
+3×1×1
+=3
+*/
+
+for (
+  let x = -1;
+  x <= 1;
+  x++
+) {
+
+  for (
+    let y = 0;
+    y <= 0;
+    y++
+  ) {
+
+    for (
+      let z = 0;
+      z <= 0;
+      z++
+    ) {
+
+      questionPositions.push(
+
+        new THREE.Vector3(
+
+          x * 0.4,
+
+          -2.7
+          +
+          y * 0.4,
+
+          z * 0.4
+
+        )
+
+      );
+
+
+      questionRotations.push(
+
+        new THREE.Quaternion()
+
+      );
+
+    }
+
+  }
+
+}
+
+
+
+/* =========================================================
+   CREATE PIECES
+========================================================= */
+
+const pieces = [];
+
+
+for (
+  let i = 0;
+  i < PIECE_COUNT;
+  i++
+) {
+
+  const mesh =
+    new THREE.Mesh(
+      geometry,
+      glassMaterial
+    );
+
+
+  mesh.position.copy(
+    cubePositions[i]
+  );
+
+
+  /*
+  애니메이션용
+  */
+
+  mesh.userData.phase =
+    seededRandom(i + 1000)
+    *
+    Math.PI
+    *
+    2;
+
+
+  mesh.userData.speed =
+    0.7
+    +
+    seededRandom(i + 1100)
+    *
+    1.3;
+
+
+  mesh.userData.float =
+    0.05
+    +
+    seededRandom(i + 1200)
+    *
+    0.15;
+
+
+  group.add(mesh);
+
+
+  pieces.push(mesh);
+
+}
+
+
+
+/* =========================================================
+   TEMP OBJECTS
+========================================================= */
+
+const tempPosition =
+  new THREE.Vector3();
+
+
+const tempQuaternion =
+  new THREE.Quaternion();
+
+
+const tempQuaternion2 =
+  new THREE.Quaternion();
+
+
+
+/* =========================================================
+   STATES
+========================================================= */
+
+const positionStates = [
+
+  cubePositions,
+
+  scatterPositions1,
+
+  barPositions,
+
+  scatterPositions2,
+
+  questionPositions
+
+];
+
+
+const rotationStates = [
+
+  cubeRotations,
+
+  scatterRotations1,
+
+  barRotations,
+
+  scatterRotations2,
+
+  questionRotations
+
+];
+
+
+
+/* =========================================================
+   EASING
+========================================================= */
+
+function smoothstep(t) {
+
+  return (
+    t *
+    t *
+    (
+      3 -
+      2 * t
+    )
+  );
+
+}
+
+
+
+/* =========================================================
+   SCROLL
+========================================================= */
+
+let targetScroll = 0;
+
+let scrollProgress = 0;
+
+
+function updateScrollTarget() {
+
+  const maxScroll =
+
+    document.documentElement
+    .scrollHeight
+
+    -
+
+    window.innerHeight;
+
+
+  targetScroll =
+
+    maxScroll <= 0
+
+    ?
+
+    0
+
+    :
+
+    window.scrollY
+    /
+    maxScroll;
+
+}
+
+
+window.addEventListener(
+  "scroll",
+  updateScrollTarget,
+  {
+    passive: true
+  }
+);
+
+
+updateScrollTarget();
+
+
+
+/* =========================================================
+   MOUSE
+========================================================= */
+
+// Drag rotation persists across all scroll morph states.
+let dragPointerId = null;
+let dragLastX = 0;
+let dragLastY = 0;
+let dragRotationX = 0;
+let dragRotationY = 0;
+let targetDragRotationX = 0;
+let targetDragRotationY = 0;
+canvas.addEventListener('pointerdown', (event) => {
+  if (event.button !== 0 || dragPointerId !== null) return;
+  dragPointerId = event.pointerId;
+  dragLastX = event.clientX;
+  dragLastY = event.clientY;
+  canvas.setPointerCapture(event.pointerId);
+  canvas.style.cursor = 'grabbing';
+});
+canvas.addEventListener('pointermove', (event) => {
+  if (event.pointerId !== dragPointerId) return;
+  targetDragRotationY += (event.clientX - dragLastX) * 0.008;
+  targetDragRotationX += (event.clientY - dragLastY) * 0.008;
+  dragLastX = event.clientX;
+  dragLastY = event.clientY;
+});
+function finishDrag(event) {
+  if (event.pointerId !== dragPointerId) return;
+  dragPointerId = null;
+  canvas.style.cursor = 'grab';
+  if (canvas.hasPointerCapture(event.pointerId)) canvas.releasePointerCapture(event.pointerId);
+}
+canvas.addEventListener('pointerup', finishDrag);
+canvas.addEventListener('pointercancel', finishDrag);
+canvas.addEventListener('lostpointercapture', finishDrag);
+canvas.addEventListener('dblclick', () => {
+  targetDragRotationX = 0;
+  targetDragRotationY = 0;
+});
+
+let mouseX = 0;
+
+let mouseY = 0;
+
+
+let targetMouseX = 0;
+
+let targetMouseY = 0;
+
+
+window.addEventListener(
+  "pointermove",
+  (event) => {
+
+    targetMouseX =
+
+      (
+        event.clientX /
+        window.innerWidth
+        -
+        0.5
+      );
+
+
+    targetMouseY =
+
+      (
+        event.clientY /
+        window.innerHeight
+        -
+        0.5
+      );
+
+  }
+);
+
+
+
+/* =========================================================
+   CLOCK
+========================================================= */
+
+const clock =
+  new THREE.Clock();
+
+
+
+/* =========================================================
+   ANIMATION
+========================================================= */
+
+function animate() {
+
+  requestAnimationFrame(
+    animate
+  );
+
+
+  const time =
+    clock.getElapsedTime();
+
+
+
+  /*
+  스크롤 관성
+
+  값 ↓ = 무거움
+  값 ↑ = 빠름
+  */
+
+  scrollProgress +=
+
+    (
+      targetScroll
+      -
+      scrollProgress
+    )
+
+    *
+    0.055;
+
+
+
+  mouseX +=
+
+    (
+      targetMouseX
+      -
+      mouseX
+    )
+
+    *
+    0.04;
+
+
+  mouseY +=
+
+    (
+      targetMouseY
+      -
+      mouseY
+    )
+
+    *
+    0.04;
+
+
+
+  /*
+  5개의 상태
+  = 4개의 transition
+  */
+
+  const totalTransitions =
+    positionStates.length - 1;
+
+
+  const scaledProgress =
+
+    THREE.MathUtils.clamp(
+      scrollProgress,
+      0,
+      1
+    )
+
+    *
+    totalTransitions;
+
+
+
+  let stateIndex =
+    Math.floor(
+      scaledProgress
+    );
+
+
+  stateIndex =
+    Math.min(
+      stateIndex,
+      totalTransitions - 1
+    );
+
+
+  let localProgress =
+    scaledProgress
+    -
+    stateIndex;
+
+
+  /*
+  마지막 상태 보정
+  */
+
+  if (
+    scrollProgress >=
+    0.999
+  ) {
+
+    stateIndex =
+      totalTransitions - 1;
+
+    localProgress =
+      1;
+
+  }
+
+
+  const eased =
+    smoothstep(
+      localProgress
+    );
+
+
+
+  const stateA =
+    positionStates[
+      stateIndex
+    ];
+
+
+  const stateB =
+    positionStates[
+      stateIndex + 1
+    ];
+
+
+  const rotationA =
+    rotationStates[
+      stateIndex
+    ];
+
+
+  const rotationB =
+    rotationStates[
+      stateIndex + 1
+    ];
+
+
+
+  /*
+  파편이 가장 많이 흩어진 시점
+
+  scroll 25%
+  scroll 75%
+  */
+
+  const chaos1 =
+
+    Math.exp(
+
+      -
+      Math.pow(
+        (
+          scrollProgress
+          -
+          0.25
+        )
+        /
+        0.12,
+        2
+      )
+
+    );
+
+
+  const chaos2 =
+
+    Math.exp(
+
+      -
+      Math.pow(
+        (
+          scrollProgress
+          -
+          0.75
+        )
+        /
+        0.12,
+        2
+      )
+
+    );
+
+
+  const chaos =
+
+    Math.max(
+      chaos1,
+      chaos2
+    );
+
+
+
+  /*
+  PIECES
+  */
+
+  for (
+    let i = 0;
+    i < pieces.length;
+    i++
+  ) {
+
+    const piece =
+      pieces[i];
+
+
+    /*
+    position morph
+    */
+
+    tempPosition
+      .copy(
+        stateA[i]
+      )
+      .lerp(
+        stateB[i],
+        eased
+      );
+
+
+
+    /*
+    흩어질 때만
+    공중에서 미세하게 움직임
+    */
+
+    const phase =
+      piece.userData.phase;
+
+
+    const speed =
+      piece.userData.speed;
+
+
+    const floating =
+      piece.userData.float
+      *
+      chaos;
+
+
+    tempPosition.x +=
+
+      Math.sin(
+        time
+        *
+        speed
+        +
+        phase
+      )
+      *
+      floating;
+
+
+    tempPosition.y +=
+
+      Math.cos(
+        time
+        *
+        speed
+        *
+        0.8
+        +
+        phase
+      )
+      *
+      floating;
+
+
+    tempPosition.z +=
+
+      Math.sin(
+        time
+        *
+        speed
+        *
+        1.2
+        +
+        phase
+      )
+      *
+      floating
+      *
+      1.5;
+
+
+
+    piece.position.copy(
+      tempPosition
+    );
+
+
+
+    /*
+    rotation morph
+    */
+
+    tempQuaternion.copy(
+      rotationA[i]
+    );
+
+
+    tempQuaternion2.copy(
+      rotationB[i]
+    );
+
+
+    piece.quaternion
+      .slerpQuaternions(
+
+        tempQuaternion,
+        tempQuaternion2,
+        eased
+
+      );
+
+
+
+    /*
+    파편 상태에서는
+    계속 천천히 회전
+    */
+
+    if (
+      chaos > 0.02
+    ) {
+
+      piece.rotation.x +=
+
+        0.002
+        *
+        chaos
+        *
+        piece.userData.speed;
+
+
+      piece.rotation.y +=
+
+        0.003
+        *
+        chaos
+        *
+        piece.userData.speed;
+
+    }
+
+  }
+
+
+
+  /* =====================================================
+     GROUP ROTATION
+
+     첫 큐브:
+     비스듬하게 보여 입체감 강조
+
+     마지막 물음표:
+     정면
+  ===================================================== */
+
+  const initialTilt =
+    1 -
+    smoothstep(
+      Math.min(
+        scrollProgress
+        /
+        0.3,
+        1
+      )
+    );
+
+
+  group.rotation.x =
+
+    -0.28
+    *
+    initialTilt
+
+    +
+
+    mouseY
+    *
+    0.08;
+
+
+  group.rotation.y =
+
+    0.58
+    *
+    initialTilt
+
+    +
+
+    mouseX
+    *
+    0.12;
+
+
+
+  /*
+  살짝 떠 있는 느낌
+  */
+
+  dragRotationX += (targetDragRotationX - dragRotationX) * 0.15;
+  dragRotationY += (targetDragRotationY - dragRotationY) * 0.15;
+  group.rotation.x += dragRotationX;
+  group.rotation.y += dragRotationY;
+
+  group.position.y =
+
+    Math.sin(
+      time * 0.55
+    )
+
+    *
+    0.035;
+
+
+
+  /*
+  카메라 미세 이동
+  */
+
+  camera.position.x +=
+
+    (
+      mouseX
+      *
+      0.15
+      -
+      camera.position.x
+    )
+
+    *
+    0.025;
+
+
+  camera.position.y +=
+
+    (
+      -mouseY
+      *
+      0.1
+      -
+      camera.position.y
+    )
+
+    *
+    0.025;
+
+
+  camera.lookAt(
+    0,
+    0,
+    0
+  );
+
+
+  renderer.render(
+    scene,
+    camera
+  );
+
+}
+
+
+animate();
+
+
+
+/* =========================================================
+   RESIZE
+========================================================= */
+
+window.addEventListener(
+  "resize",
+  () => {
+
+    camera.aspect =
+
+      window.innerWidth
+      /
+      window.innerHeight;
+
+
+    camera.updateProjectionMatrix();
+
+
+    renderer.setSize(
+      window.innerWidth,
+      window.innerHeight
+    );
+
+
+    renderer.setPixelRatio(
+
+      Math.min(
+        window.devicePixelRatio,
+        1.7
+      )
+
+    );
+
+  }
+);
+
+</script>
+
 </body>
 </html>
