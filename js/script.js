@@ -3,9 +3,9 @@ import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 
 const info = {
-  unfold: ['01', 'Unfold', '서로 교차하던 리본이 부드러운 S자 곡선으로 풀립니다.'],
-  scatter: ['02', 'Scatter', '28개의 유리 조각이 사방으로 흩어지며 공간감을 만듭니다.'],
-  morph: ['03', 'Morph', '유리 리본 자체가 물결치고 꼬이며 다른 구조로 변형됩니다.'],
+  unfold: ['01', 'Unfold', '겹쳐진 유리 매듭이 열리며 길고 큰 나선 리본으로 펼쳐집니다.'],
+  scatter: ['02', 'Scatter', '28개의 유리 조각이 회전하며 더 넓은 공간으로 흩어집니다.'],
+  morph: ['03', 'Morph', '유리 매듭이 크게 부풀고 비틀리며 꽃잎 같은 물결 고리로 변합니다.'],
   orbit: ['04', 'Orbit', '리본의 입체 구조를 카메라 회전과 클로즈업으로 탐색합니다.'],
   wire: ['05', 'Wireframe', '빛을 반사하는 유리 표면이 구조선 드로잉으로 전환됩니다.']
 };
@@ -196,11 +196,11 @@ function centerAt(t, amount) {
 
   // 01 UNFOLD
   if (mode === 'unfold') {
+    const angle = t * TAU * 1.75;
     const targetShape = new THREE.Vector3(
-      (t - 0.5) * 4.5,
-      0.54 * Math.sin(t * Math.PI * 2.25) +
-        0.07 * Math.sin(t * TAU * 4),
-      0.28 * Math.cos(t * TAU * 1.5)
+      1.05 * Math.cos(angle),
+      (t - 0.5) * 4.8,
+      1.05 * Math.sin(angle)
     );
 
     return knot.lerp(targetShape, smooth(amount));
@@ -209,13 +209,16 @@ function centerAt(t, amount) {
   // 03 MORPH
   if (mode === 'morph') {
     const wave = smooth(amount);
-
-    knot.x += wave * 0.22 * Math.cos(6 * a + amount * 5);
-    knot.y += wave * 0.31 * Math.sin(5 * a + amount * 4);
-    knot.z += wave * (
-      0.48 * Math.sin(2 * a + 1.5) +
-      0.25 * Math.cos(5 * a)
+    const petalRadius = 1.65 + 0.55 * Math.cos(5 * a + amount * 3);
+    const bloom = new THREE.Vector3(
+      petalRadius * Math.cos(a),
+      petalRadius * Math.sin(a),
+      0.85 * Math.sin(3 * a + amount * 4)
     );
+    knot.lerp(bloom, wave);
+    const swell = Math.sin(amount * Math.PI);
+    knot.multiplyScalar(1 + swell * 0.3);
+    knot.z += swell * 0.55 * Math.sin(4 * a + amount * TAU);
   }
 
   return knot;
@@ -344,7 +347,7 @@ function sample(tIndex, px, py) {
   const t = tIndex / STEPS;
 
   const turn =
-    (mode === 'morph' ? progress * 5.7 * t : 0) +
+    (mode === 'morph' ? progress * TAU * 2 * t : 0) +
     0.16 * Math.sin(t * TAU * 3);
 
   const s = Math.sin(turn);
@@ -634,6 +637,7 @@ document.querySelectorAll('[data-mode]').forEach(button => {
 
     target = 0;
     progress = 0;
+    oldP = -1;
   });
 });
 
@@ -667,12 +671,12 @@ function animate(ms) {
     Math.abs(progress - oldP) > 0.00008 ||
     oldP === -1
   ) {
-    updateGeometry(p);
+    updateGeometry(mode === 'unfold' || mode === 'morph' ? progress : p);
     oldP = progress;
   }
 
   // 02 SCATTER
-  const s = mode === 'scatter' ? smooth(p) : 0;
+  const s = mode === 'scatter' ? smooth(progress) : 0;
 
   for (let i = 0; i < PIECES; i++) {
     const f = fragments[i];
@@ -682,13 +686,13 @@ function animate(ms) {
     ].clone().normalize();
 
     f.mesh.position
-      .copy(radial.multiplyScalar(s * 1.8))
-      .addScaledVector(f.dir, s * 1.6);
+      .copy(radial.multiplyScalar(s * 4.2))
+      .addScaledVector(f.dir, s * 2.8);
 
     f.mesh.rotation.set(
-      s * f.spin.x * 3.2,
-      s * f.spin.y * 4.0,
-      s * f.spin.z * 2.7
+      s * f.spin.x * 5.2,
+      s * f.spin.y * 6.0,
+      s * f.spin.z * 4.7
     );
   }
 
@@ -701,7 +705,10 @@ function animate(ms) {
   lineMat.opacity = w * 0.97;
 
   // CAMERA
-  const aspectShift = innerWidth < 750 ? 0.92 : 1;
+  // Fit portrait screens by aspect ratio so the ribbon stays inside the viewport.
+  const aspectShift = innerWidth < 750
+    ? Math.min(0.72, 1.15 * camera.aspect)
+    : 1;
   const baseZ = innerWidth < 750 ? 8.0 : 7.1;
 
   // 04 ORBIT
@@ -710,7 +717,7 @@ function animate(ms) {
   camera.position.set(
     Math.sin(orbit * Math.PI * 1.55) * 2.8 * orbit,
     0.45 + orbit * 1.5,
-    baseZ - orbit * 2.0
+    baseZ - orbit * 2.0 + s * 5.0 + (mode === 'morph' ? p * 1.2 : 0)
   );
 
   camera.lookAt(0, 0, 0);
