@@ -3,6 +3,8 @@
 body { margin: 0; background: var(--background); }
 button { font: inherit; color: inherit; cursor: pointer; }
 #view { position: fixed; inset: 0; width: 100%; height: 100%; }
+#view { cursor: grab; touch-action: pan-y; }
+#view.dragging { cursor: grabbing; }
 .veil { position: fixed; inset: 0; pointer-events: none; background: radial-gradient(ellipse, transparent 35%, #ffffff35); }
 .top { position: fixed; top: 0; left: 0; width: 100%; padding: 32px 40px; display: flex; justify-content: space-between; gap: 24px; }
 .logo { font-size: 14px; font-weight: 700; letter-spacing: .16em; }
@@ -12,7 +14,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .tabs button.active { background: #ffffff80; border-color: #ffffffb0; }
 .palette { position: fixed; top: 112px; left: 40px; padding: 16px; border: 1px solid #ffffffb0; border-radius: 20px; background: #ffffff65; backdrop-filter: blur(18px); box-shadow: 0 12px 36px #34344808; }
 .palette > span { display: block; margin-bottom: 12px; font-size: 9px; letter-spacing: .18em; opacity: .65; }
-.palette-buttons { display: flex; gap: 6px; }
+.palette-buttons { display: flex; flex-wrap: wrap; gap: 6px; }
 .palette button { display: flex; flex-direction: column; align-items: center; gap: 8px; min-width: 52px; padding: 8px 6px; border: 1px solid transparent; border-radius: 12px; background: transparent; font-size: 10px; transition: background .2s, transform .2s; }
 .palette button::before { content: ''; width: 26px; height: 26px; border-radius: 50%; background: var(--swatch); box-shadow: inset 0 0 0 1px #ffffff90, inset -3px -4px 8px #ffffff60, 0 3px 8px #35354815; }
 .palette button:hover { background: #ffffff80; transform: translateY(-2px); }

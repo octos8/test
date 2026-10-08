@@ -36,7 +36,7 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.7));
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.6;
+renderer.toneMappingExposure = 1.35;
 
 // SCENE
 const scene = new THREE.Scene();
@@ -62,21 +62,21 @@ environment.dispose();
 pmrem.dispose();
 
 // LIGHTS
-scene.add(new THREE.HemisphereLight('#ffffff', '#9fabb8', 2));
+scene.add(new THREE.HemisphereLight('#ffffff', '#9fabb8', 1.8));
 
-const keyLight = new THREE.DirectionalLight('#ffffff', 4.8);
+const keyLight = new THREE.DirectionalLight('#ffffff', 4.2);
 keyLight.position.set(-3, 5, 6);
 scene.add(keyLight);
 
-const purple = new THREE.PointLight('#c5b0ff', 30, 10);
+const purple = new THREE.PointLight('#c5b0ff', 27, 10);
 purple.position.set(-3, -1, 3);
 scene.add(purple);
 
-const cyan = new THREE.PointLight('#a3f4ff', 24, 12);
+const cyan = new THREE.PointLight('#a3f4ff', 21, 12);
 cyan.position.set(4, 2, 2);
 scene.add(cyan);
 
-const amber = new THREE.PointLight('#fff0cb', 18, 10);
+const amber = new THREE.PointLight('#fff0cb', 16, 10);
 amber.position.set(0, -4, -2);
 scene.add(amber);
 
@@ -113,12 +113,21 @@ const themes = {
   lavender: ['#bca0ef', '#e9e3ef', '#ad79ff', '#dcc4ff', '#ffd5ed', '#825ca8'],
   aqua: ['#91e4d9', '#e0ece9', '#8cebd2', '#78dfff', '#e4ffd4', '#398d91'],
   rose: ['#f0adc9', '#efe3e7', '#ff9dcd', '#d0b5ff', '#ffe0ba', '#b56489'],
-  gold: ['#f2d291', '#eee8dc', '#ffd789', '#ffeac0', '#ffbfa4', '#a78440']
+  gold: ['#f2d291', '#eee8dc', '#ffd789', '#ffeac0', '#ffbfa4', '#a78440'],
+  prism: ['#f5f8ff', '#d9dad7', '#d9caff', '#c4f1ff', '#fff0d5', '#687585']
 };
 function applyTheme(name) {
   const theme = themes[name];
   if (!theme) return;
   glass.color.set(theme[0]);
+  // Clear silver glass with stronger rainbow refraction, inspired by the reference.
+  const prism = name === 'prism';
+  glass.roughness = prism ? 0.035 : 0.075;
+  glass.dispersion = prism ? 0.55 : 0.22;
+  glass.iridescence = prism ? 1 : 0.9;
+  glass.iridescenceIOR = prism ? 1.5 : 1.38;
+  glass.iridescenceThicknessRange = prism ? [180, 1000] : [140, 850];
+  glass.envMapIntensity = prism ? 3.2 : 2.8;
   scene.background.set(theme[1]);
   [purple, cyan, amber].forEach((light, i) => light.color.set(theme[i + 2]));
   lineMat.color.set(theme[5]);
@@ -523,10 +532,50 @@ function updateGeometry(p) {
 // MOUSE INTERACTION
 let pointerX = 0;
 let pointerY = 0;
+let followX = 0;
+let followY = 0;
+let dragX = 0;
+let dragY = 0;
+let rotationX = 0;
+let rotationY = 0;
+let dragging = false;
+let lastX = 0;
+let lastY = 0;
+
+canvas.addEventListener('pointerdown', e => {
+  if (e.button !== 0 || e.pointerType === 'touch') return;
+  dragging = true;
+  lastX = e.clientX;
+  lastY = e.clientY;
+  canvas.setPointerCapture(e.pointerId);
+  canvas.classList.add('dragging');
+});
+function endDrag(e) {
+  dragging = false;
+  canvas.classList.remove('dragging');
+  if (canvas.hasPointerCapture(e.pointerId)) canvas.releasePointerCapture(e.pointerId);
+}
+canvas.addEventListener('pointerup', endDrag);
+canvas.addEventListener('pointercancel', endDrag);
+canvas.addEventListener('lostpointercapture', () => {
+  dragging = false;
+  canvas.classList.remove('dragging');
+});
+document.documentElement.addEventListener('pointerleave', () => {
+  pointerX = 0;
+  pointerY = 0;
+});
 
 window.addEventListener('pointermove', e => {
-  pointerX = (e.clientX / innerWidth - 0.5) * 2;
-  pointerY = (e.clientY / innerHeight - 0.5) * 2;
+  if (e.pointerType === 'touch') return;
+  pointerX = THREE.MathUtils.clamp((e.clientX / innerWidth - 0.5) * 2, -1, 1);
+  pointerY = THREE.MathUtils.clamp((e.clientY / innerHeight - 0.5) * 2, -1, 1);
+  if (dragging) {
+    dragY += (e.clientX - lastX) * 0.008;
+    dragX += (e.clientY - lastY) * 0.008;
+    lastX = e.clientX;
+    lastY = e.clientY;
+  }
 }, { passive: true });
 
 // SCROLL CONTROL
@@ -590,9 +639,23 @@ document.querySelectorAll('[data-mode]').forEach(button => {
 
 // ANIMATION LOOP
 let oldP = -1;
+let previousTime;
 
 function animate(ms) {
   requestAnimationFrame(animate);
+  const dt = previousTime === undefined ? 1 / 60 : Math.min((ms - previousTime) / 1000, 0.05);
+  previousTime = ms;
+  const response = reducedMotion ? 1 : 1 - Math.exp(-8 * dt);
+  followX = lerp(followX, pointerX, response);
+  followY = lerp(followY, pointerY, response);
+  rotationX = lerp(rotationX, dragX, response);
+  rotationY = lerp(rotationY, dragY, response);
+
+  // Move the studio lights independently of the ribbon for shifting highlights.
+  keyLight.position.set(-3 + followX * 4, 5 - followY * 3, 6);
+  purple.position.set(-3 + followX * 1.6, -1 - followY * 2, 3);
+  cyan.position.set(4 - followX * 2, 2 + followY * 1.5, 2);
+  amber.position.set(followX * 2, -4 - followY, -2);
 
   progress = reducedMotion
     ? target
@@ -638,7 +701,7 @@ function animate(ms) {
   lineMat.opacity = w * 0.97;
 
   // CAMERA
-  const aspectShift = innerWidth < 750 ? 1.15 : 1;
+  const aspectShift = innerWidth < 750 ? 0.92 : 1;
   const baseZ = innerWidth < 750 ? 8.0 : 7.1;
 
   // 04 ORBIT
@@ -655,11 +718,11 @@ function animate(ms) {
   group.rotation.set(
     -0.12 +
       (mode === 'morph' ? p * 0.55 : 0) +
-      pointerY * 0.045,
+      followY * 0.65 + rotationX,
 
     -0.28 +
       (mode === 'orbit' ? orbit * 4.0 : 0) +
-      pointerX * 0.055,
+      followX * 1.1 + rotationY,
 
     -0.12 +
       (mode === 'unfold' ? -p * 0.05 : 0)
